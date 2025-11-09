@@ -1,10 +1,13 @@
+// gmailAuth.js
 import fs from "fs";
 import path from "path";
+import dotenv from "dotenv";
 import { google } from "googleapis";
 
+dotenv.config();
+
 const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
-const CREDENTIALS_PATH = path.join(process.cwd(), "credentials.json");
-const TOKEN_PATH = path.join(process.cwd(), "token.json");
+const TOKEN_PATH = process.env.GOOGLE_TOKEN_PATH || "./token.json";
 
 async function loadSavedCredentialsIfExist() {
   try {
@@ -17,13 +20,10 @@ async function loadSavedCredentialsIfExist() {
 }
 
 async function saveCredentials(client) {
-  const content = fs.readFileSync(CREDENTIALS_PATH, "utf-8");
-  const keys = JSON.parse(content);
-  const key = keys.installed || keys.web;
   const payload = JSON.stringify({
     type: "authorized_user",
-    client_id: key.client_id,
-    client_secret: key.client_secret,
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    client_secret: process.env.GOOGLE_CLIENT_SECRET,
     refresh_token: client.credentials.refresh_token,
   });
   fs.writeFileSync(TOKEN_PATH, payload);
@@ -33,15 +33,17 @@ async function authorize() {
   let client = await loadSavedCredentialsIfExist();
   if (client) return client;
 
-  const content = fs.readFileSync(CREDENTIALS_PATH, "utf-8");
-  const keys = JSON.parse(content);
-  const { client_secret, client_id, redirect_uris } = keys.installed;
-  const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+  const oAuth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  );
 
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: "offline",
     scope: SCOPES,
   });
+
   console.log("Authorize this app by visiting this URL:", authUrl);
 
   const readline = await import("readline");

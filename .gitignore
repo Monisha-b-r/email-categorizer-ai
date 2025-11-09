@@ -1,4 +1,5 @@
-# Sensitive files
+node_modules
 .env
 token.json
 credentials.json
+.DS_Store

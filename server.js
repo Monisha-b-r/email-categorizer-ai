@@ -6,6 +6,10 @@ import dotenv from "dotenv";
 import userRoutes from "./routes/userRoutes.js";
 import emailRoutes from "./routes/emailRoutes.js";
 import { createEmailIndex } from "./config/elastic.js";
+import cron from "node-cron";
+import { fetchRecentEmails } from "./services/gmailSync.js"; 
+import { startImapListeners } from "./services/imapService.js";
+
 
 dotenv.config();
 const app = express();
@@ -23,14 +27,22 @@ mongoose
   .connect(MONGO_URI)
   .then(async () => {
     console.log("✅ MongoDB connected successfully");
-
-    // ✅ Create Elasticsearch index safely
     await createEmailIndex();
 
-    // ✅ Start the server only after DB + Index setup
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
+
+    // 🟢 Start IMAP real-time sync
+startImapListeners()
+  .then(() => console.log("🔄 Real-time IMAP sync started!"))
+  .catch((err) => console.error("❌ IMAP Sync failed:", err.message));
+
+    // // 🕒 Auto-sync Gmail every 2 minutes
+    // cron.schedule("*/2 * * * *", async () => {
+    //   console.log("🔁 Auto-syncing Gmail...");
+    //   await fetchRecentEmails();
+    // });
   })
   .catch((err) => console.log("❌ MongoDB connection failed:", err.message));
 
@@ -39,12 +51,9 @@ app.get("/", (req, res) => {
   res.send("🚀 ReachInbox Backend Running!");
 });
 
-// -------- STEP 3: AI-Based Email Categorization --------
-
-// Simple keyword-based categorizer function
+// -------- AI-Based Email Categorization --------
 function categorizeEmail(subject, body) {
   const text = (subject + " " + body).toLowerCase();
-
   if (text.includes("meeting") || text.includes("schedule") || text.includes("call"))
     return "Meeting Booked";
   if (text.includes("interested") || text.includes("let's connect"))
@@ -55,18 +64,13 @@ function categorizeEmail(subject, body) {
     return "Out of Office";
   if (text.includes("unsubscribe") || text.includes("spam"))
     return "Spam";
-
   return "General";
 }
 
-// ✅ POST API: Categorize email
 app.post("/api/categorize", (req, res) => {
   const { subject, body } = req.body;
-
-  if (!subject || !body) {
+  if (!subject || !body)
     return res.status(400).json({ message: "Subject and body are required." });
-  }
-
   const category = categorizeEmail(subject, body);
   res.json({ category });
 });
