@@ -1,0 +1,4 @@
+# Sensitive files
+.env
+token.json
+credentials.json
